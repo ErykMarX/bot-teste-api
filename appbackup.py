@@ -1,3 +1,10 @@
+# estrutura de arquivos:
+# bot_teste_api_webhook/
+# ├── app.py
+# ├── requirements.txt
+# ├── Procfile
+# └── logs_testes_api.json (será criado automaticamente)
+
 from flask import Flask, request
 import requests
 import json
@@ -8,10 +15,12 @@ app = Flask(__name__)
 
 BOT_TOKEN = '7099713057:AAFZJlzCNXGhNA9_hWkuCI9UevoEG_YhRuc'
 API_URL = f'https://api.telegram.org/bot{BOT_TOKEN}'
+USERNAME = 'integrador@saperx.com.br'
+PASSWORD = 'Meyewhfz7h5nUdsefD1Yas1sx3'
+
 ARQUIVO_LOG = 'logs_testes_api.json'
 
-usuarios = {}  # Armazena o progresso das perguntas por usuário
-
+# Salva os testes realizados em um JSON
 def salvar_log(dados):
     if os.path.exists(ARQUIVO_LOG):
         with open(ARQUIVO_LOG, 'r') as f:
@@ -22,6 +31,7 @@ def salvar_log(dados):
     with open(ARQUIVO_LOG, 'w') as f:
         json.dump(logs, f, indent=2)
 
+# Envia mensagem para o Telegram
 def enviar(chat_id, texto):
     requests.post(f"{API_URL}/sendMessage", data={
         'chat_id': chat_id,
@@ -35,40 +45,22 @@ def webhook():
     chat_id = msg.get("chat", {}).get("id")
     texto = msg.get("text", "")
 
-    if chat_id not in usuarios:
-        usuarios[chat_id] = {"etapa": "inicial"}
-
-    etapa = usuarios[chat_id]["etapa"]
-
     if texto.startswith("/testarapi"):
-        usuarios[chat_id] = {"etapa": "client_id"}
-        enviar(chat_id, "Informe o *client_id*:")
-
-    elif etapa == "client_id":
-        usuarios[chat_id]["client_id"] = texto.strip()
-        usuarios[chat_id]["etapa"] = "client_secret"
-        enviar(chat_id, "Informe o *client_secret*:")
-
-    elif etapa == "client_secret":
-        usuarios[chat_id]["client_secret"] = texto.strip()
-        usuarios[chat_id]["etapa"] = "ip"
-        enviar(chat_id, "Informe o *IP/base da API* (ex: https://192.168.0.1):")
-
-    elif etapa == "ip":
+        enviar(chat_id, "🔍 Me envie a URL base da API (ex: https://api.exemplo.com):")
+    elif texto.startswith("http"):
         url_base = texto.strip()
-        client_id = usuarios[chat_id]['client_id']
-        client_secret = usuarios[chat_id]['client_secret']
+        client_id = "API_KEY_EXEMPLO"
+        client_secret = "API_SECRET_EXEMPLO"
 
         payload = {
-            "grant_type": "password",
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "username": "integrador@saperx.com.br",
-            "password": "Meyewhfz7h5nUdsefD1Yasl3x3"
+            'grant_type': 'password',
+            'username': USERNAME,
+            'password': PASSWORD,
+            'client_id': client_id,
+            'client_secret': client_secret
         }
-
         try:
-            r = requests.post(f"{url_base}/oauth/token", json=payload, headers={"Content-Type": "application/json"}, verify=False)
+            r = requests.post(f"{url_base}/oauth/token", data=payload, timeout=10)
             status = r.status_code
             conteudo = r.json() if status == 200 else r.text
             salvar_log({
@@ -81,12 +73,9 @@ def webhook():
             resposta = f"✅ Status {status}\n{conteudo}" if status == 200 else f"❌ Erro {status}\n{conteudo}"
         except Exception as e:
             resposta = f"❌ Falha na requisição:\n{e}"
-
         enviar(chat_id, resposta)
-        usuarios[chat_id]["etapa"] = "final"
-
     else:
-        enviar(chat_id, "Envie /testarapi para iniciar o teste da API.")
+        enviar(chat_id, "Envie /testarapi para iniciar ou envie a URL da API diretamente.")
 
     return "ok"
 
@@ -95,5 +84,4 @@ def index():
     return "Bot rodando com Webhook!", 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
-
+     app.run(debug=True, host="0.0.0.0", port=5000)
